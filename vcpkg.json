@@ -16,6 +16,14 @@
       "name": "icu",
       "platform": "!osx"
     },
+    {
+      "name": "libogg",
+      "platform": "android"
+    },
+    {
+      "name": "libvorbis",
+      "platform": "android"
+    },
     "luajit",
     "lz4",
     {
@@ -29,6 +37,10 @@
     },
     "openmw-osg",
     "sdl2",
+    {
+      "name": "sdl2-image",
+      "platform": "android"
+    },
     {
       "name": "recastnavigation",
       "platform": "osx"
