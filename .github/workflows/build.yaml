@@ -9,6 +9,26 @@ env:
   VCPKG_REVISION: 137197a8f85e6c6cf1843ef024af7d9c28bb0bde
 
 jobs:
+  android:
+    strategy:
+      fail-fast: true
+      matrix:
+        triplet:
+          - x64-android
+          - arm64-android
+
+    name: android-${{ matrix.msvc_version.year }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build . -t "vcpkg-android"
+      - run: CONTAINER_ID=$(docker create vcpkg-android) docker cp -a $CONTAINER_ID:/project/android-deps.7z ./vcpkg-{{ matrix.triplet }}-${{ github.sha }}.7z
+      - name: Store exported vcpkg packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: vcpkg-${{ matrix.triplet }}-${{ github.sha }}
+          path: ${{ github.workspace }}/vcpkg-{{ matrix.triplet }}-${{ github.sha }}.7z
+
   macos:
     runs-on: macos-latest
     env:

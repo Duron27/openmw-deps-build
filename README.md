@@ -22,6 +22,15 @@ Also the following [**variable**](https://docs.github.com/en/actions/learn-githu
 
 Any pushes should create a branch/commit on the openmw-dep repo. However, the manifest file links will not work. You will need to create a tag/release for that to work.
 
+## Android
+
+To build the dependencies for android, you can use the Dockerfile.
+
+1. `docker build . -t "vcpkg-android"`
+1. `docker run -t "vcpkg-android"`
+
+[Guide from here.](https://learn.microsoft.com/en-us/vcpkg/users/platforms/android#building-android-libraries-in-a-docker-container)
+
 ## Testing OpenMW with MacOS
 
 1. `vcpkg install --overlay-ports=ports --overlay-triplets=triplets --triplet arm64-osx`
