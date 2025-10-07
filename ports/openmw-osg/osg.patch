@@ -1,50 +1,771 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index b44ef8b..85c29cd 100644
+index 21d2c05d423..0a5f61b0d62 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -799,6 +799,8 @@ IF(NOT ANDROID)
-         ENDIF()
-
-     ELSE()
-+        FIND_PACKAGE(JPEG)
-+        FIND_PACKAGE(PNG)
-         FIND_PACKAGE(TIFF)
-         FIND_PACKAGE(QuickTime)
-         FIND_PACKAGE(QTKit)
+@@ -735,7 +735,7 @@ OPTION(BUILD_OSG_PLUGINS "Build OSG Plugins - Disable for compile testing exampl
+ mark_as_advanced(BUILD_OSG_PLUGINS)
+ ################################################################################
+ # 3rd Party Dependency Stuff
+-OPTION(OSG_FIND_3RD_PARTY_DEPS "Enable to search for Android or Windows dependencies in ./3rdparty" ON)
++OPTION(OSG_FIND_3RD_PARTY_DEPS "Enable to search for Android or Windows dependencies in ./3rdparty" OFF)
+ 
+ IF(WIN32 AND NOT ANDROID AND OSG_FIND_3RD_PARTY_DEPS)
+     INCLUDE(Find3rdPartyDependencies)
+diff --git a/CMakeModules/FindCOLLADA.cmake b/CMakeModules/FindCOLLADA.cmake
+index 7caf3545eb8..8b6ec83f92a 100644
+--- a/CMakeModules/FindCOLLADA.cmake
++++ b/CMakeModules/FindCOLLADA.cmake
+@@ -19,7 +19,7 @@ SET( COLLADA_ENV_VAR_AVAILABLE $ENV{COLLADA_DIR} )
+ IF ( COLLADA_ENV_VAR_AVAILABLE )
+     SET(COLLADA_DOM_ROOT "$ENV{COLLADA_DIR}/dom" CACHE PATH "Location of Collada DOM directory" FORCE)
+ ELSE ()
+-    SET(COLLADA_DOM_ROOT "${ACTUAL_3DPARTY_DIR}/include/1.4/dom" CACHE PATH "Location of Collada DOM directory" FORCE)
++    SET(COLLADA_DOM_ROOT "${ACTUAL_3DPARTY_DIR}/include/collada-dom2.5/1.4/dom" CACHE PATH "Location of Collada DOM directory" FORCE)
+ ENDIF()
+ 
+ 
+@@ -74,6 +74,7 @@ FIND_PATH(COLLADA_INCLUDE_DIR dae.h
+     /opt/include
+     /usr/freeware/include
+     ${ACTUAL_3DPARTY_DIR}/include
++    ${ACTUAL_3DPARTY_DIR}/include/collada-dom2.5/
+     PATH_SUFFIXES
+     colladadom
+     collada-dom
+diff --git a/CMakeModules/OsgAndroidMacroUtils.cmake b/CMakeModules/OsgAndroidMacroUtils.cmake
+index 50c22e0f1f5..e8453208f4a 100644
+--- a/CMakeModules/OsgAndroidMacroUtils.cmake
++++ b/CMakeModules/OsgAndroidMacroUtils.cmake
+@@ -163,7 +163,7 @@ MACRO(ANDROID_3RD_PARTY)
+     )
+     #set(ENV{AND_OSG_LIB_NAMES} "$ENV{AND_OSG_LIB_NAMES} libft2")
+     #set(ENV{AND_OSG_LIB_PATHS} "$ENV{AND_OSG_LIB_PATHS}include ${FREETYPE_DIR}/Android.mk \n")
+-    set(FREETYPE_INCLUDE_DIRS ${FREETYPE_DIR}/include ${FREETYPE_DIR}/include/freetype/config)
++    set(FREETYPE_INCLUDE_DIRS ${FREETYPE_DIR}/include ${FREETYPE_DIR}/include/freetype2)
+     if(FREETYPE_DIR)
+         message(STATUS "FREETYPE found ${FREETYPE_DIR}" )
+         set(FREETYPE_FOUND "Yes")
+diff --git a/CMakeModules/OsgMacroUtils.cmake b/CMakeModules/OsgMacroUtils.cmake
+index cafd8725ba3..59221ca26ae 100644
+--- a/CMakeModules/OsgMacroUtils.cmake
++++ b/CMakeModules/OsgMacroUtils.cmake
+@@ -301,6 +301,10 @@ MACRO(SETUP_PLUGIN PLUGIN_NAME)
+         ADD_LIBRARY(${TARGET_TARGETNAME} STATIC ${TARGET_SRC} ${TARGET_H})
+     ENDIF(DYNAMIC_OPENSCENEGRAPH)
+ 
++    # XXX: remove the "lib" prefix e.g. "libosgdb_bmp.a" => "osgdb_bmp.a"
++    # for some reason this is only a problem on android
++    SET_TARGET_PROPERTIES(${TARGET_TARGETNAME} PROPERTIES PREFIX "")
++
+     IF(MSVC)
+         IF(NOT CMAKE24)
+             SET_OUTPUT_DIR_PROPERTY_260(${TARGET_TARGETNAME} "${OSG_PLUGINS}")        # Sets the ouput to be /osgPlugin-X.X.X ; also ensures the /Debug /Release are removed
+diff --git a/include/OpenThreads/Atomic b/include/OpenThreads/Atomic
+index ba6723354e8..da8db7227c1 100644
+--- a/include/OpenThreads/Atomic
++++ b/include/OpenThreads/Atomic
+@@ -17,21 +17,7 @@
+ #include <OpenThreads/Config>
+ #include <OpenThreads/Exports>
+ 
+-#if defined(_OPENTHREADS_ATOMIC_USE_BSD_ATOMIC)
+-# include <libkern/OSAtomic.h>
+-# define _OPENTHREADS_ATOMIC_USE_LIBRARY_ROUTINES
+-#elif defined(_OPENTHREADS_ATOMIC_USE_GCC_BUILTINS) && defined(__i386__)
+-# define _OPENTHREADS_ATOMIC_USE_LIBRARY_ROUTINES
+-#elif defined(_OPENTHREADS_ATOMIC_USE_WIN32_INTERLOCKED)
+-# define _OPENTHREADS_ATOMIC_USE_LIBRARY_ROUTINES
+-#elif defined(_OPENTHREADS_ATOMIC_USE_SUN)
+-# include <atomic.h>
+-# include "Mutex"
+-# include "ScopedLock"
+-#elif defined(_OPENTHREADS_ATOMIC_USE_MUTEX)
+-# include "Mutex"
+-# include "ScopedLock"
+-#endif
++#include <atomic>
+ 
+ #if defined(_OPENTHREADS_ATOMIC_USE_LIBRARY_ROUTINES)
+ #define _OPENTHREADS_ATOMIC_INLINE
+@@ -61,19 +47,7 @@ class OPENTHREAD_EXPORT_DIRECTIVE Atomic {
+     Atomic(const Atomic&);
+     Atomic& operator=(const Atomic&);
+ 
+-#if defined(_OPENTHREADS_ATOMIC_USE_MUTEX)
+-    mutable Mutex _mutex;
+-#endif
+-#if defined(_OPENTHREADS_ATOMIC_USE_WIN32_INTERLOCKED)
+-    volatile long _value;
+-#elif defined(_OPENTHREADS_ATOMIC_USE_BSD_ATOMIC)
+-    volatile int32_t _value;
+-#elif defined(_OPENTHREADS_ATOMIC_USE_SUN)
+-    volatile uint_t _value;
+-    mutable Mutex _mutex;  // needed for xor
+-#else
+-    volatile unsigned _value;
+-#endif
++    std::atomic<unsigned> _value;
+ };
+ 
+ /**
+@@ -95,10 +69,7 @@ private:
+     AtomicPtr(const AtomicPtr&);
+     AtomicPtr& operator=(const AtomicPtr&);
+ 
+-#if defined(_OPENTHREADS_ATOMIC_USE_MUTEX)
+-    mutable Mutex _mutex;
+-#endif
+-    void* volatile _ptr;
++    std::atomic<void*> _ptr;
+ };
+ 
+ #if !defined(_OPENTHREADS_ATOMIC_USE_LIBRARY_ROUTINES)
+@@ -106,178 +77,56 @@ private:
+ _OPENTHREADS_ATOMIC_INLINE unsigned
+ Atomic::operator++()
+ {
+-#if defined(_OPENTHREADS_ATOMIC_USE_GCC_BUILTINS)
+-    return __sync_add_and_fetch(&_value, 1);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_MIPOSPRO_BUILTINS)
+-    return __add_and_fetch(&_value, 1);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_SUN)
+-    return atomic_inc_uint_nv(&_value);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_MUTEX)
+-    ScopedLock<Mutex> lock(_mutex);
+     return ++_value;
+-#else
+-    return ++_value;
+-#endif
+ }
+ 
+ _OPENTHREADS_ATOMIC_INLINE unsigned
+ Atomic::operator--()
+ {
+-#if defined(_OPENTHREADS_ATOMIC_USE_GCC_BUILTINS)
+-    return __sync_sub_and_fetch(&_value, 1);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_MIPOSPRO_BUILTINS)
+-    return __sub_and_fetch(&_value, 1);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_SUN)
+-    return atomic_dec_uint_nv(&_value);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_MUTEX)
+-    ScopedLock<Mutex> lock(_mutex);
+-    return --_value;
+-#else
+     return --_value;
+-#endif
+ }
+ 
+ _OPENTHREADS_ATOMIC_INLINE unsigned
+ Atomic::AND(unsigned value)
+ {
+-#if defined(_OPENTHREADS_ATOMIC_USE_GCC_BUILTINS)
+-    return __sync_fetch_and_and(&_value, value);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_MIPOSPRO_BUILTINS)
+-    return __and_and_fetch(&_value, value);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_SUN)
+-    return atomic_and_uint_nv(&_value, value);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_MUTEX)
+-    ScopedLock<Mutex> lock(_mutex);
+-    _value &= value;
+-    return _value;
+-#else
+-    _value &= value;
+-    return _value;
+-#endif
++    return (_value &= value);
+ }
+ 
+ _OPENTHREADS_ATOMIC_INLINE unsigned
+ Atomic::OR(unsigned value)
+ {
+-#if defined(_OPENTHREADS_ATOMIC_USE_GCC_BUILTINS)
+-    return __sync_fetch_and_or(&_value, value);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_MIPOSPRO_BUILTINS)
+-    return __or_and_fetch(&_value, value);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_SUN)
+-    return atomic_or_uint_nv(&_value, value);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_MUTEX)
+-    ScopedLock<Mutex> lock(_mutex);
+-    _value |= value;
+-    return _value;
+-#else
+-    _value |= value;
+-    return _value;
+-#endif
++    return (_value |= value);
+ }
+ 
+ _OPENTHREADS_ATOMIC_INLINE unsigned
+ Atomic::XOR(unsigned value)
+ {
+-#if defined(_OPENTHREADS_ATOMIC_USE_GCC_BUILTINS)
+-    return __sync_fetch_and_xor(&_value, value);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_MIPOSPRO_BUILTINS)
+-    return __xor_and_fetch(&_value, value);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_SUN)
+-    ScopedLock<Mutex> lock(_mutex);
+-    _value ^= value;
+-    return _value;
+-#elif defined(_OPENTHREADS_ATOMIC_USE_MUTEX)
+-    ScopedLock<Mutex> lock(_mutex);
+-    _value ^= value;
+-    return _value;
+-#else
+-    _value ^= value;
+-    return _value;
+-#endif
++    return (_value ^= value);
+ }
+ 
+ _OPENTHREADS_ATOMIC_INLINE unsigned
+ Atomic::exchange(unsigned value)
+ {
+-#if defined(_OPENTHREADS_ATOMIC_USE_GCC_BUILTINS)
+-    return __sync_lock_test_and_set(&_value, value);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_MIPOSPRO_BUILTINS)
+-    return __compare_and_swap(&_value, _value, value);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_SUN)
+-    return atomic_cas_uint(&_value, _value, value);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_MUTEX)
+-    ScopedLock<Mutex> lock(_mutex);
+-    unsigned oldval = _value;
+-    _value = value;
+-    return oldval;
+-#else
+-    unsigned oldval = _value;
+-    _value = value;
+-    return oldval;
+-#endif
++    return _value.exchange(value);
+ }
+ 
+ _OPENTHREADS_ATOMIC_INLINE
+ Atomic::operator unsigned() const
+ {
+-#if defined(_OPENTHREADS_ATOMIC_USE_GCC_BUILTINS)
+-    __sync_synchronize();
+-    return _value;
+-#elif defined(_OPENTHREADS_ATOMIC_USE_MIPOSPRO_BUILTINS)
+-    __synchronize();
+-    return _value;
+-#elif defined(_OPENTHREADS_ATOMIC_USE_SUN)
+-    membar_consumer(); // Hmm, do we need???
+-    return _value;
+-#elif defined(_OPENTHREADS_ATOMIC_USE_MUTEX)
+-    ScopedLock<Mutex> lock(_mutex);
+-    return _value;
+-#else
+     return _value;
+-#endif
+ }
+ 
+ _OPENTHREADS_ATOMIC_INLINE bool
+ AtomicPtr::assign(void* ptrNew, const void* const ptrOld)
+ {
+-#if defined(_OPENTHREADS_ATOMIC_USE_GCC_BUILTINS)
+-    return __sync_bool_compare_and_swap(&_ptr, (void *)ptrOld, ptrNew);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_MIPOSPRO_BUILTINS)
+-    return __compare_and_swap((unsigned long*)&_ptr, (unsigned long)ptrOld, (unsigned long)ptrNew);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_SUN)
+-    return ptrOld == atomic_cas_ptr(&_ptr, const_cast<void*>(ptrOld), ptrNew);
+-#elif defined(_OPENTHREADS_ATOMIC_USE_MUTEX)
+-    ScopedLock<Mutex> lock(_mutex);
+-    if (_ptr != ptrOld)
+-        return false;
+-    _ptr = ptrNew;
+-    return true;
+-#else
+-    if (_ptr != ptrOld)
+-        return false;
+-    _ptr = ptrNew;
+-    return true;
+-#endif
++    void *old = (void*) ptrOld;
++    return _ptr.compare_exchange_strong(old, ptrNew);
+ }
+ 
+ _OPENTHREADS_ATOMIC_INLINE void*
+ AtomicPtr::get() const
+ {
+-#if defined(_OPENTHREADS_ATOMIC_USE_GCC_BUILTINS)
+-    __sync_synchronize();
+-    return _ptr;
+-#elif defined(_OPENTHREADS_ATOMIC_USE_MIPOSPRO_BUILTINS)
+-    __synchronize();
+     return _ptr;
+-#elif defined(_OPENTHREADS_ATOMIC_USE_SUN)
+-    membar_consumer(); // Hmm, do we need???
+-    return _ptr;
+-#elif defined(_OPENTHREADS_ATOMIC_USE_MUTEX)
+-    ScopedLock<Mutex> lock(_mutex);
+-    return _ptr;
+-#else
+-    return _ptr;
+-#endif
+ }
+ 
+ #endif // !defined(_OPENTHREADS_ATOMIC_USE_LIBRARY_ROUTINES)
+diff --git a/include/osg/BufferObject b/include/osg/BufferObject
+index 3ec365544fb..cc4128aacc2 100644
+--- a/include/osg/BufferObject
++++ b/include/osg/BufferObject
+@@ -22,6 +22,7 @@
+ #include <osg/FrameStamp>
+ #include <osg/GLObjects>
+ 
++#include <atomic>
+ #include <iosfwd>
+ #include <list>
+ #include <map>
+@@ -590,7 +591,7 @@ protected:
+         osg::ref_ptr<BufferObject>      _bufferObject;
+         osg::ref_ptr<ModifiedCallback>  _modifiedCallback;
+ 
+-        unsigned int _numClients;
++        std::atomic<unsigned> _numClients;
+ };
+ 
+ 
+diff --git a/include/osg/Hint b/include/osg/Hint
+index 274af53cef1..222f747615a 100644
+--- a/include/osg/Hint
++++ b/include/osg/Hint
+@@ -68,6 +68,8 @@ public:
+ 
+         virtual void apply(State& state) const;
+ 
++        static void GL4ES_SavePSA() { glHint(0xA10F, 0xA10F); };
++
+ protected:
+ 
+ 
+diff --git a/include/osg/PolygonOffset b/include/osg/PolygonOffset
+index 15ad397e917..613222a03d2 100644
+--- a/include/osg/PolygonOffset
++++ b/include/osg/PolygonOffset
+@@ -57,10 +57,6 @@ class OSG_EXPORT PolygonOffset : public StateAttribute
+         virtual bool getModeUsage(StateAttribute::ModeUsage& usage) const
+         {
+             usage.usesMode(GL_POLYGON_OFFSET_FILL);
+-#if !defined(OSG_GLES1_AVAILABLE) && !defined(OSG_GLES2_AVAILABLE)
+-            usage.usesMode(GL_POLYGON_OFFSET_LINE);
+-            usage.usesMode(GL_POLYGON_OFFSET_POINT);
+-#endif
+             return true;
+         }
+ 
+diff --git a/include/osgUtil/IncrementalCompileOperation b/include/osgUtil/IncrementalCompileOperation
+index 25f14197685..a4ffa3356ab 100644
+--- a/include/osgUtil/IncrementalCompileOperation
++++ b/include/osgUtil/IncrementalCompileOperation
+@@ -14,6 +14,8 @@
+ #ifndef OSGUTIL_INCREMENTALCOMPILEOPERATOR
+ #define OSGUTIL_INCREMENTALCOMPILEOPERATOR
+ 
++#include <atomic>
++
+ #include <osgUtil/GLObjectsVisitor>
+ #include <osg/Geometry>
+ 
+@@ -305,11 +307,11 @@ class OSGUTIL_EXPORT IncrementalCompileOperation : public osg::GraphicsOperation
+ 
+         double                              _targetFrameRate;
+         double                              _minimumTimeAvailableForGLCompileAndDeletePerFrame;
+-        unsigned int                        _maximumNumOfObjectsToCompilePerFrame;
++        std::atomic<unsigned>                        _maximumNumOfObjectsToCompilePerFrame;
+         double                              _flushTimeRatio;
+         double                              _conservativeTimeRatio;
+ 
+-        unsigned int                        _currentFrameNumber;
++        std::atomic<unsigned>                        _currentFrameNumber;
+         unsigned int                        _compileAllTillFrameNumber;
+ 
+         osg::ref_ptr<osg::Geometry>         _forceTextureDownloadGeometry;
+diff --git a/src/OpenThreads/common/Atomic.cpp b/src/OpenThreads/common/Atomic.cpp
+index 21c336435ff..84fec8e7861 100644
+--- a/src/OpenThreads/common/Atomic.cpp
++++ b/src/OpenThreads/common/Atomic.cpp
+@@ -25,6 +25,8 @@ namespace OpenThreads {
+ 
+ #if defined(_OPENTHREADS_ATOMIC_USE_LIBRARY_ROUTINES)
+ 
++    #error Not supported.
++
+ // Non inline implementations for two special cases:
+ // * win32
+ // * i386 gcc
+diff --git a/src/osg/GLExtensions.cpp b/src/osg/GLExtensions.cpp
+index 5ecf63a5e5f..84fe68405d2 100644
+--- a/src/osg/GLExtensions.cpp
++++ b/src/osg/GLExtensions.cpp
+@@ -335,8 +335,10 @@ OSG_INIT_SINGLETON_PROXY(GLExtensionDisableStringInitializationProxy, osg::getGL
+             static void *handle = dlopen("libGLESv1_CM.so", RTLD_NOW);
+         #elif defined(OSG_GLES2_AVAILABLE)
+             static void *handle = dlopen("libGLESv2.so", RTLD_NOW);
++        #elif defined(OSG_GLES3_AVAILABLE)
++            static void *handle = dlopen("libGLESv3.so", RTLD_NOW);
+         #elif defined(OSG_GL1_AVAILABLE)
+-            static void *handle = dlopen("libGL.so", RTLD_NOW);
++            static void *handle = dlopen("ng_gl4es.so", RTLD_NOW);
+         #endif
+         return dlsym(handle, funcName);
+ 
+diff --git a/src/osg/Image.cpp b/src/osg/Image.cpp
+index 9a09f4082f3..b29f4b0dafe 100644
+--- a/src/osg/Image.cpp
++++ b/src/osg/Image.cpp
+@@ -806,15 +806,15 @@ unsigned int Image::computePixelSizeInBits(GLenum format,GLenum type)
+         {
+             osg::Vec3i footprint = computeBlockFootprint(format);
+             unsigned int pixelsPerBlock = footprint.x() * footprint.y();
+-            unsigned int bitsPerBlock = computeBlockSize(format, 0);//16 x 8 = 128
++            unsigned int bitsPerBlock = computeBlockSize(format, 0) * 8; // Convert bytes to bits
+             unsigned int bitsPerPixel = bitsPerBlock / pixelsPerBlock;
+             if (bitsPerBlock == bitsPerPixel * pixelsPerBlock) {
+-                OSG_WARN << "Image::computePixelSizeInBits(format,type) : bits per pixel (" << bitsPerPixel << ") is not an integer for GL_KHR_texture_compression_astc_hdr sizes other than 4x4 and 8x8." << std::endl;
++                // Integer division worked perfectly
+                 return bitsPerPixel;
+             } else {
+                 OSG_WARN << "Image::computePixelSizeInBits(format,type) : bits per pixel (" << bitsPerBlock << "/" << pixelsPerBlock << ") is not an integer for GL_KHR_texture_compression_astc_hdr size" << footprint.x()  << "x" << footprint.y() << "." << std::endl;
++                return 0;
+             }
+-            return 0;
+         }
+         default: break;
+     }
+@@ -1827,6 +1827,8 @@ void Image::flipVertical()
+ 
+     const bool dxtc(dxtc_tool::isDXTC(_pixelFormat));
+     const bool rgtc(dxtc_tool::isRGTC(_pixelFormat));
++    const bool astc(isCompressed() && (_pixelFormat >= GL_COMPRESSED_RGBA_ASTC_4x4_KHR && _pixelFormat <= GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR));
++
+     if (_mipmapData.empty())
+     {
+         // no mipmaps,
+@@ -1840,9 +1842,10 @@ void Image::flipVertical()
+                     OSG_NOTICE << "Notice Image::flipVertical(): Vertical flip do not succeed" << std::endl;
+                 }
+             }
+-            else
++            // ASTC textures are stored in KTX format with native OpenGL orientation - skip flipping
++            else if (!astc)
+             {
+-                if (isCompressed()) OSG_NOTICE << "Notice Image::flipVertical(): image is compressed but normal v-flip is used" << std::endl;
++                if (isCompressed()) OSG_NOTICE << "Notice Image::flipVertical(): file=" << _fileName << " image is compressed but normal v-flip is used" << std::endl;
+                 // its not a compressed image, so implement flip oursleves.
+                 unsigned char* top = data(0,0,r);
+                 unsigned char* bottom = top + (_t-1)*rowStep;
+@@ -1887,7 +1890,8 @@ void Image::flipVertical()
+                     OSG_NOTICE << "Notice Image::flipVertical(): Vertical flip did not succeed" << std::endl;
+                 }
+             }
+-            else
++            // ASTC textures are stored in KTX format with native OpenGL orientation - skip flipping
++            else if (!astc)
+             {
+                 // it's not a compressed image, so implement flip ourselves.
+                 unsigned int mipRowSize = computeRowWidthInBytes(s, _pixelFormat, _dataType, _packing);
+diff --git a/src/osg/Texture.cpp b/src/osg/Texture.cpp
+index 2c0bd4b4ebb..17197ab0024 100644
+--- a/src/osg/Texture.cpp
++++ b/src/osg/Texture.cpp
+@@ -151,7 +151,7 @@ InternalPixelRelations sizedInternalFormats[] = {
+     , { GL_RGB5_A1                             , GL_RGBA             , GL_UNSIGNED_SHORT_1_5_5_5_REV                }
+     , { GL_RGB5_A1                             , GL_RGBA             , GL_UNSIGNED_INT_10_10_10_2                   }
+     , { GL_RGB5_A1                             , GL_RGBA             , GL_UNSIGNED_INT_2_10_10_10_REV               }
+- // , { GL_RGBA16F                             , GL_RGBA             , GL_HALF_FLOAT                                }
++    , { GL_RGBA16F                             , GL_RGBA             , GL_HALF_FLOAT                                }
+     , { GL_RGBA16F_ARB                         , GL_RGBA             , GL_FLOAT                                     }
+     , { GL_RGBA32F_ARB                         , GL_RGBA             , GL_FLOAT                                     }
+ 
+@@ -1995,85 +1995,85 @@ void Texture::getCompressedSize(GLenum internalFormat, GLint width, GLint height
+     else if (internalFormat == GL_COMPRESSED_RGBA_ASTC_4x4_KHR || internalFormat == GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR)
+     {
+         blockSize = 16;
+-        size = ceil(width/4.0)*ceil(height/4.0)*blockSize;
++        size = ((width+3)/4)*((height+3)/4)*depth*blockSize;
+         return;
+     }
+     else if (internalFormat == GL_COMPRESSED_RGBA_ASTC_5x4_KHR || internalFormat == GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x4_KHR)
+     {
+         blockSize = 16;
+-        size = ceil(width/5.0)*ceil(height/4.0)*blockSize;
++        size = ((width+4)/5)*((height+3)/4)*depth*blockSize;
+         return;
+     }
+     else if (internalFormat == GL_COMPRESSED_RGBA_ASTC_5x5_KHR || internalFormat == GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5_KHR)
+     {
+         blockSize = 16;
+-        size = ceil(width/5.0)*ceil(height/5.0)*blockSize;
++        size = ((width+4)/5)*((height+4)/5)*depth*blockSize;
+         return;
+     }
+     else if (internalFormat == GL_COMPRESSED_RGBA_ASTC_6x5_KHR || internalFormat == GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x5_KHR)
+     {
+         blockSize = 16;
+-        size = ceil(width/6.0)*ceil(height/5.0)*blockSize;
++        size = ((width+5)/6)*((height+4)/5)*depth*blockSize;
+         return;
+     }
+     else if (internalFormat == GL_COMPRESSED_RGBA_ASTC_6x6_KHR || internalFormat == GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6_KHR)
+     {
+         blockSize = 16;
+-        size = ceil(width/6.0)*ceil(height/6.0)*blockSize;
++        size = ((width+5)/6)*((height+5)/6)*depth*blockSize;
+         return;
+     }
+     else if (internalFormat == GL_COMPRESSED_RGBA_ASTC_8x5_KHR || internalFormat == GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x5_KHR)
+     {
+         blockSize = 16;
+-        size = ceil(width/8.0)*ceil(height/5.0)*blockSize;
++        size = ((width+7)/8)*((height+4)/5)*depth*blockSize;
+         return;
+     }
+     else if (internalFormat == GL_COMPRESSED_RGBA_ASTC_8x6_KHR || internalFormat == GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x6_KHR)
+     {
+         blockSize = 16;
+-        size = ceil(width/8.0)*ceil(height/6.0)*blockSize;
++        size = ((width+7)/8)*((height+5)/6)*depth*blockSize;
+         return;
+     }
+     else if (internalFormat == GL_COMPRESSED_RGBA_ASTC_8x8_KHR || internalFormat == GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x8_KHR)
+     {
+         blockSize = 16;
+-        size = ceil(width/8.0)*ceil(height/8.0)*blockSize;
++        size = ((width+7)/8)*((height+7)/8)*depth*blockSize;
+         return;
+     }
+     else if (internalFormat == GL_COMPRESSED_RGBA_ASTC_10x5_KHR || internalFormat == GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x5_KHR)
+     {
+         blockSize = 16;
+-        size = ceil(width/10.0)*ceil(height/5.0)*blockSize;
++        size = ((width+9)/10)*((height+4)/5)*depth*blockSize;
+         return;
+     }
+     else if (internalFormat == GL_COMPRESSED_RGBA_ASTC_10x6_KHR || internalFormat == GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x6_KHR)
+     {
+         blockSize = 16;
+-        size = ceil(width/10.0)*ceil(height/6.0)*blockSize;
++        size = ((width+9)/10)*((height+5)/6)*depth*blockSize;
+         return;
+     }
+     else if (internalFormat == GL_COMPRESSED_RGBA_ASTC_10x8_KHR || internalFormat == GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x8_KHR)
+     {
+         blockSize = 16;
+-        size = ceil(width/10.0)*ceil(height/8.0)*blockSize;
++        size = ((width+9)/10)*((height+7)/8)*depth*blockSize;
+         return;
+     }
+     else if (internalFormat == GL_COMPRESSED_RGBA_ASTC_10x10_KHR || internalFormat == GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x10_KHR)
+     {
+         blockSize = 16;
+-        size = ceil(width/10.0)*ceil(height/10.0)*blockSize;
++        size = ((width+9)/10)*((height+9)/10)*depth*blockSize;
+         return;
+     }
+     else if (internalFormat == GL_COMPRESSED_RGBA_ASTC_12x10_KHR || internalFormat == GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR)
+     {
+         blockSize = 16;
+-        size = ceil(width/12.0)*ceil(height/10.0)*blockSize;
++        size = ((width+11)/12)*((height+9)/10)*depth*blockSize;
+         return;
+     }
+     else if (internalFormat == GL_COMPRESSED_RGBA_ASTC_12x12_KHR || internalFormat == GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR)
+     {
+         blockSize = 16;
+-        size = ceil(width/12.0)*ceil(height/12.0)*blockSize;
++        size = ((width+11)/12)*((height+11)/12)*depth*blockSize;
+         return;
+     }
+     else
+@@ -2133,11 +2133,11 @@ void Texture::applyTexParameters(GLenum target, State& state) const
+             wr = CLAMP;
+     }
+ 
+-    #if defined(OSG_GLES1_AVAILABLE) || defined(OSG_GLES2_AVAILABLE) || defined(OSG_GLES3_AVAILABLE) || defined(OSG_GL3_AVAILABLE)
++//    #if defined(OSG_GLES1_AVAILABLE) || defined(OSG_GLES2_AVAILABLE) || defined(OSG_GLES3_AVAILABLE) || defined(OSG_GL3_AVAILABLE)
+         if (ws == CLAMP) ws = CLAMP_TO_EDGE;
+         if (wt == CLAMP) wt = CLAMP_TO_EDGE;
+         if (wr == CLAMP) wr = CLAMP_TO_EDGE;
+-    #endif
++//    #endif
+ 
+     const Image * image = getImage(0);
+     if( image &&
+@@ -2204,11 +2204,12 @@ void Texture::applyTexParameters(GLenum target, State& state) const
+     {
+         if (_use_shadow_comparison)
+         {
+-            glTexParameteri(target, GL_TEXTURE_COMPARE_MODE_ARB, GL_COMPARE_R_TO_TEXTURE_ARB);
+-            glTexParameteri(target, GL_TEXTURE_COMPARE_FUNC_ARB, _shadow_compare_func);
+-            #if defined(OSG_GL1_AVAILABLE) || defined(OSG_GL2_AVAILABLE)
+-                glTexParameteri(target, GL_DEPTH_TEXTURE_MODE_ARB, _shadow_texture_mode);
+-            #endif
++           glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
++           glTexParameteri(target, GL_TEXTURE_COMPARE_FUNC, _shadow_compare_func);
++
++ //          #if defined(OSG_GL1_AVAILABLE) || defined(OSG_GL2_AVAILABLE)
++ //              glTexParameteri(target, GL_DEPTH_TEXTURE_MODE_ARB, _shadow_texture_mode);
++ //          #endif
+ 
+             // if ambient value is 0 - it is default behaviour of GL_ARB_shadow
+             // no need for GL_ARB_shadow_ambient in this case
+@@ -2497,9 +2498,13 @@ void Texture::applyTexImage2D_load(State& state, GLenum target, const Image* ima
+             GLint blockSize, size;
+             getCompressedSize(_internalFormat, inwidth, inheight, 1, blockSize,size);
+ 
++            int size2 = size;
++            if (useHardwareMipMapGeneration)
++                size2 *= -1;
++
+             extensions->glCompressedTexImage2D(target, 0, _internalFormat,
+                 inwidth, inheight,0,
+-                size,
++                size2,
+                 dataPtr);
+         }
+ 
+@@ -2619,6 +2624,9 @@ void Texture::applyTexImage2D_load(State& state, GLenum target, const Image* ima
+ 
+                         getCompressedSize(_internalFormat, width, height, 1, blockSize,size);
+ 
++                        if (k == numMipmapLevels - 1)
++                            size *= -1;
++
+                         extensions->glCompressedTexImage2D(target, k, _internalFormat,
+                                                            width, height, _borderWidth,
+                                                            size, dataPtr + image->getMipmapOffset(k));
 diff --git a/src/osgDB/Registry.cpp b/src/osgDB/Registry.cpp
-index 14a8d04..83bacf2 100644
+index c47439b611e..8a0f91cfbc7 100644
 --- a/src/osgDB/Registry.cpp
 +++ b/src/osgDB/Registry.cpp
-@@ -308,18 +308,6 @@ Registry::Registry()
-
-     addFileExtensionAlias("js", "V8");
-
--#if defined(DARWIN_IMAGEIO)
--    addFileExtensionAlias("jpg",  "imageio");
--    addFileExtensionAlias("jpe",  "imageio");
--    addFileExtensionAlias("jpeg", "imageio");
--    addFileExtensionAlias("tif",  "imageio");
--    addFileExtensionAlias("tiff", "imageio");
--    addFileExtensionAlias("gif",  "imageio");
--    addFileExtensionAlias("png",  "imageio");
--    addFileExtensionAlias("psd",  "imageio");
--    addFileExtensionAlias("tga",  "imageio");
--
--#endif
-
- #if defined(USE_QTKIT)
-     addFileExtensionAlias("mov",  "QTKit");
+@@ -793,6 +793,8 @@ std::string Registry::createLibraryNameForExtension(const std::string& ext)
+     return prepend+"osgdb_"+lowercase_ext+OSG_LIBRARY_POSTFIX_WITH_QUOTES+".dll";
+ #elif macintosh
+     return prepend+"osgdb_"+lowercase_ext+OSG_LIBRARY_POSTFIX_WITH_QUOTES;
++#elif defined(__ANDROID__)
++    return prepend+"lib"+"osgdb_"+lowercase_ext+OSG_LIBRARY_POSTFIX_WITH_QUOTES+ADDQUOTES(OSG_PLUGIN_EXTENSION);
+ #else
+     return prepend+"osgdb_"+lowercase_ext+OSG_LIBRARY_POSTFIX_WITH_QUOTES+ADDQUOTES(OSG_PLUGIN_EXTENSION);
+ #endif
 diff --git a/src/osgPlugins/CMakeLists.txt b/src/osgPlugins/CMakeLists.txt
-index f2ca656..dbeb39c 100644
+index 277dbebd5bd..cb30e4068c2 100644
 --- a/src/osgPlugins/CMakeLists.txt
 +++ b/src/osgPlugins/CMakeLists.txt
-@@ -239,8 +239,5 @@ ENDIF()
- #    ADD_SUBDIRECTORY(OpenAL)
- # ENDIF()
-
--IF(APPLE AND NOT ANDROID)
--    ADD_PLUGIN_DIRECTORY(imageio)
+@@ -161,9 +161,13 @@ IF(NOT OSG_GLES1_AVAILABLE AND NOT OSG_GLES2_AVAILABLE)
+     ENDIF()
+ ENDIF()
+ 
+-IF(COLLADA_FOUND AND OSG_CPP_EXCEPTIONS_AVAILABLE)
++#fix me
++#IF(COLLADA_FOUND AND OSG_CPP_EXCEPTIONS_AVAILABLE)
++#    ADD_PLUGIN_DIRECTORY(dae)
++#ENDIF()
++
++    SET(COLLADA_DOM_2_4_OR_LATER TRUE)
+     ADD_PLUGIN_DIRECTORY(dae)
 -ENDIF()
-
- IF(AV_FOUNDATION_FOUND)
-     ADD_PLUGIN_DIRECTORY(avfoundation)
+ 
+ IF(FBX_FOUND AND OSG_CPP_EXCEPTIONS_AVAILABLE)
+     ADD_PLUGIN_DIRECTORY(fbx)
+diff --git a/src/osgPlugins/ktx/ReaderWriterKTX.cpp b/src/osgPlugins/ktx/ReaderWriterKTX.cpp
+index a14d35c5761..184dc88b289 100644
+--- a/src/osgPlugins/ktx/ReaderWriterKTX.cpp
++++ b/src/osgPlugins/ktx/ReaderWriterKTX.cpp
+@@ -210,6 +210,9 @@ osgDB::ReaderWriter::ReadResult ReaderWriterKTX::readKTXStream(std::istream& fin
+         header.glInternalFormat, header.glFormat,
+         header.glType, totalImageData, osg::Image::USE_NEW_DELETE);
+ 
++    // KTX textures are stored in their original coordinate system (TOP_LEFT)
++    image->setOrigin(osg::Image::TOP_LEFT);
++
+     if (header.numberOfMipmapLevels > 1)
+         image->setMipmapLevels(mipmapData);
+ 
+diff --git a/src/osgText/shaders/osgText_Text_frag.cpp b/src/osgText/shaders/osgText_Text_frag.cpp
+index 74af76369e3..41b1c8aceaa 100644
+--- a/src/osgText/shaders/osgText_Text_frag.cpp
++++ b/src/osgText/shaders/osgText_Text_frag.cpp
+@@ -1,63 +1,20 @@
+-char osgText_Text_frag[] = "$OSG_GLSL_VERSION\n"
++char osgText_Text_frag[] = "#version 120\n"
+                            "\n"
+                            "#pragma import_defines( BACKDROP_COLOR, SHADOW, OUTLINE)\n"
+-                           "#pragma import_defines( SIGNED_DISTANCE_FIELD, TEXTURE_DIMENSION, GLYPH_DIMENSION)\n"
++                           "#pragma import_defines( TEXTURE_DIMENSION, GLYPH_DIMENSION)\n"
++                           "#define SIGNED_DISTANCE_FIELD 0\n"
++                           "#define TEXTURELOD textureLod\n"
++                           "#define TEXTURE texture\n"
++                           "#define osg_FragColor gl_FragColor\n"
+                            "\n"
+-                           "#ifdef GL_ES\n"
+-                           "    #extension GL_OES_standard_derivatives : enable\n"
+-                           "    #ifndef GL_OES_standard_derivatives\n"
+-                           "        #undef SIGNED_DISTANCE_FIELD\n"
+-                           "    #endif\n"
+-                           "#endif\n"
+-                           "\n"
+-                           "#if !defined(GL_ES)\n"
+-                           "    #if __VERSION__>=400\n"
+-                           "        #define osg_TextureQueryLOD textureQueryLod\n"
+-                           "    #else\n"
+-                           "        #extension GL_ARB_texture_query_lod : enable\n"
+-                           "        #ifdef GL_ARB_texture_query_lod\n"
+-                           "            #define osg_TextureQueryLOD textureQueryLOD\n"
+-                           "        #endif\n"
+-                           "    #endif\n"
+-                           "#endif\n"
+-                           "\n"
+-                           "#if __VERSION__>=130\n"
+-                           "    #define TEXTURE texture\n"
+-                           "#else\n"
+-                           "    #define TEXTURE texture2D\n"
+-                           "#endif\n"
+-                           "\n"
+-                           "#if __VERSION__>=130\n"
+-                           "    #define TEXTURELOD textureLod\n"
+-                           "#else\n"
+-                           "    #ifdef GL_ES\n"
+-                           "        #extension GL_EXT_shader_texture_lod : enable\n"
+-                           "        #ifdef GL_EXT_shader_texture_lod\n"
+-                           "            #define TEXTURELOD texture2DLodEXT\n"
+-                           "        #else\n"
+-                           "            #define TEXTURELOD texture2DLod\n"
+-                           "        #endif\n"
+-                           "    #else\n"
+-                           "        #define TEXTURELOD texture2DLod\n"
+-                           "    #endif\n"
+-                           "#endif\n"
+-                           "\n"
+-                           "#if !defined(GL_ES) && __VERSION__>=130\n"
++                           "#if 0\n"
+                            "    #define ALPHA r\n"
+                            "    #define SDF g\n"
+                            "#else\n"
+                            "    #define ALPHA a\n"
+                            "    #define SDF r\n"
+                            "#endif\n"
+-                           "\n"
+-                           "$OSG_PRECISION_FLOAT\n"
+-                           "\n"
+-                           "#if __VERSION__>=130\n"
+-                           "    out vec4 osg_FragColor;\n"
+-                           "#else\n"
+-                           "    #define osg_FragColor gl_FragColor\n"
+-                           "#endif\n"
+-                           "\n"
++                           "\n"                      
+                            "uniform sampler2D glyphTexture;\n"
+                            "\n"
+                            "$OSG_VARYING_IN vec2 texCoord;\n"
+diff --git a/src/osgText/shaders/osgText_Text_vert.cpp b/src/osgText/shaders/osgText_Text_vert.cpp
+index 44073a2d0e6..1b7c8ad0a7d 100644
+--- a/src/osgText/shaders/osgText_Text_vert.cpp
++++ b/src/osgText/shaders/osgText_Text_vert.cpp
+@@ -1,5 +1,4 @@
+-char osgText_Text_vert[] = "$OSG_GLSL_VERSION\n"
+-                           "$OSG_PRECISION_FLOAT\n"
++char osgText_Text_vert[] = "#version 120\n"
+                            "\n"
+                            "$OSG_VARYING_OUT vec2 texCoord;\n"
+                            "$OSG_VARYING_OUT vec4 vertexColor;\n"

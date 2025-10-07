@@ -1,8 +1,17 @@
 {
   "dependencies": [
+    "icu",
+    "zlib",
+    "libjpeg-turbo",
+    "libpng",
+    "freetype",
+    "libxml2",
+    "openal-soft",
     "boost-geometry",
     "boost-iostreams",
     "boost-program-options",
+    "ffmpeg",
+    "sdl2",
     {
       "name": "bullet3",
       "features": [
@@ -10,44 +19,9 @@
         "multithreading"
       ]
     },
-    "ffmpeg",
-    "freetype",
-    {
-      "name": "icu",
-      "platform": "!osx"
-    },
-    {
-      "name": "libogg",
-      "platform": "android"
-    },
-    {
-      "name": "libvorbis",
-      "platform": "android"
-    },
+    "mygui",
     "luajit",
     "lz4",
-    {
-      "name": "mygui",
-      "platform": "!osx"
-    },
-    "openal-soft",
-    {
-      "name": "openmw-mygui-osx",
-      "platform": "osx"
-    },
-    "openmw-osg",
-    "sdl2",
-    {
-      "name": "sdl2-image",
-      "platform": "android"
-    },
-    {
-      "name": "recastnavigation",
-      "platform": "osx"
-    },
-    {
-      "name": "unshield",
-      "platform": "osx"
-    }
+    "openmw-osg"
   ]
 }

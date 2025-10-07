@@ -2,8 +2,14 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Set Android API level
+ENV ANDROID_API 24
+
+# Set target ABI
+ENV ANDROID_ABI arm64-v8a
+
 RUN apt-get update && apt-get -y upgrade && \
-    apt-get -y install git g++ wget curl zip vim pkg-config tar cmake unzip ca-certificates
+    apt-get -y install git g++ wget curl zip vim pkg-config tar cmake unzip ca-certificates python3 autoconf autoconf-archive automake libtool
 
 # Download Android NDK
 RUN \
