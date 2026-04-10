@@ -3,7 +3,7 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Set Android API level
-ENV ANDROID_API 24
+ENV ANDROID_API 28
 
 # Set target ABI
 ENV ANDROID_ABI arm64-v8a
@@ -13,11 +13,11 @@ RUN apt-get update && apt-get -y upgrade && \
 
 # Download Android NDK
 RUN \
-  wget https://dl.google.com/android/repository/android-ndk-r26d-linux.zip && \
-  unzip android-ndk-r26d-linux.zip && \
-  rm -rf android-ndk-r26d-linux.zip
+  wget https://dl.google.com/android/repository/android-ndk-r29-linux.zip && \
+  unzip android-ndk-r29-linux.zip && \
+  rm -rf android-ndk-r29-linux.zip
 
-ENV ANDROID_NDK_HOME=/android-ndk-r26d
+ENV ANDROID_NDK_HOME=/android-ndk-r29
 
 WORKDIR /vcpkg
 RUN git clone https://github.com/microsoft/vcpkg .
@@ -32,7 +32,11 @@ COPY vcpkg.json ./
 COPY ports ./ports
 COPY triplets ./triplets
 
-RUN vcpkg install --overlay-ports=ports --overlay-triplets=triplets --triplet arm64-android
+RUN vcpkg install --overlay-ports=ports --overlay-triplets=triplets --triplet arm64-android \
+  || (echo "=== VCPKG BUILD FAILED ===" \
+      && find /vcpkg/buildtrees -maxdepth 3 -type f -name '*.log' -print -exec cat {} \; \
+      && exit 1)
+
 RUN vcpkg export \
     --x-all-installed \
     --7zip \

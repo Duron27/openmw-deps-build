@@ -1,5 +1,6 @@
 {
   "dependencies": [
+    "ang-gl4es",
     "icu",
     "zlib",
     "libjpeg-turbo",

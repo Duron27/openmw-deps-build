@@ -16,6 +16,7 @@
     "opengl-registry",
     "tiff",
     "zlib",
+    "ang-gl4es",
     {
       "name": "vcpkg-cmake",
       "host": true
