@@ -32,6 +32,8 @@ COPY vcpkg.json ./
 COPY ports ./ports
 COPY triplets ./triplets
 
+#RUN git clone --recurse-submodules https://github.com/sisah2/Ng-gl4es -b Openmw3 NG-GL4ES
+
 RUN vcpkg install --overlay-ports=ports --overlay-triplets=triplets --triplet arm64-android \
   || (echo "=== VCPKG BUILD FAILED ===" \
       && find /vcpkg/buildtrees -maxdepth 3 -type f -name '*.log' -print -exec cat {} \; \

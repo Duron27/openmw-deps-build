@@ -1,0 +1,38 @@
+From a8da79c4c569243d28f77ba566bf11b4765c00a7 Mon Sep 17 00:00:00 2001
+From: Duron27 <duron27@gmail.com>
+Date: Sat, 11 Apr 2026 06:10:57 -0400
+Subject: [PATCH] Add linker option to use lld for GNU/Clang
+
+---
+ CMakeLists.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 216fb98b..56a2f508 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -12,6 +12,7 @@ project(ng_gl4es)
+     if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+         add_compile_options(-g0 -O3 -ffunction-sections -fdata-sections)
+         add_link_options(-Wl,--gc-sections)
++        add_link_options(-fuse-ld=lld)
+     elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+         add_compile_options(/O2 /GL)
+     endif()
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 56a2f508..ca128449 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -3,12 +3,6 @@ cmake_minimum_required(VERSION 3.10)
+ project(ng_gl4es)
+ 
+ #if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+-    include(CheckIPOSupported)
+-    check_ipo_supported(RESULT LTOSupported OUTPUT LTOError)
+-    if (LTOSupported)
+-        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+-    endif()
+-
+     if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+         add_compile_options(-g0 -O3 -ffunction-sections -fdata-sections)
+         add_link_options(-Wl,--gc-sections)

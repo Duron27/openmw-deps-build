@@ -1,6 +1,6 @@
 {
   "dependencies": [
-    "ang-gl4es",
+    "ng-gl4es",
     "icu",
     "zlib",
     "libjpeg-turbo",
@@ -22,7 +22,6 @@
     },
     "mygui",
     "luajit",
-    "lz4",
-    "openmw-osg"
+    "lz4"
   ]
 }
