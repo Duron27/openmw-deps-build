@@ -5,18 +5,15 @@
   "description": "Fork of OpenSceneGraph for OpenMW-specific performance improvements.",
   "homepage": "https://github.com/openmw/osg",
   "license": null,
-  "supports": "!uwp",
+  "supports": "android",
   "dependencies": [
     "collada-dom",
     "freetype",
-    "libiconv",
     "libjpeg-turbo",
     "libpng",
     "libxml2",
-    "opengl-registry",
-    "tiff",
     "zlib",
-    "ang-gl4es",
+    "ng-gl4es",
     {
       "name": "vcpkg-cmake",
       "host": true

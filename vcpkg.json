@@ -22,6 +22,7 @@
     },
     "mygui",
     "luajit",
+    "openmw-osg",
     "lz4"
   ]
 }
